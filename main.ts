@@ -100,7 +100,7 @@ function degreesToRadians (degrees: number) {
 }
 info.onLifeZero(function () {
     music.stopAllSounds()
-    game.reset()
+    game.gameOver(false)
 })
 sprites.onOverlap(SpriteKind.Projectile, SpriteKind.Enemy, function (sprite, otherSprite) {
     sprite.setKind(SpriteKind.StruckProjectile)
