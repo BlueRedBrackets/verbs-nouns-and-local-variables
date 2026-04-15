@@ -454,4 +454,10 @@ namespace objects {
     export function asImage(val: any): Image {
         return val as Image;
     }
+
+    //% block="$val as sprite"
+    //% group="Utility"
+    export function asSprite(val: any): Sprite {
+        return val as Sprite;
+    }
 }
