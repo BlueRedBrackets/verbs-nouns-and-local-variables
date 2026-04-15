@@ -161,6 +161,7 @@ function defineEnemies () {
     })
 }
 let ship = 0
+music.stopAllSounds()
 music.play(music.createSong(assets.song`theme`), music.PlaybackMode.LoopingInBackground)
 defineNouns()
 defineWeapons()
