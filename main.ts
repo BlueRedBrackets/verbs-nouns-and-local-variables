@@ -99,6 +99,7 @@ function degreesToRadians (degrees: number) {
     return degrees * Math.PI / 180
 }
 info.onLifeZero(function () {
+    music.stopAllSounds()
     game.reset()
 })
 sprites.onOverlap(SpriteKind.Projectile, SpriteKind.Enemy, function (sprite, otherSprite) {
