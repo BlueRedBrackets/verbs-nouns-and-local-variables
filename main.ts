@@ -161,25 +161,31 @@ function defineEnemies () {
     })
 }
 let ship = 0
+let gameLoaded = false
 music.stopAllSounds()
 music.play(music.createSong(assets.song`theme`), music.PlaybackMode.LoopingInBackground)
 defineNouns()
 defineWeapons()
 defineMisc()
 defineEnemies()
-ship = objects.ask(objects.newInstance("Ship"), "spawn")
-objects.tell(ship, "equip", objects.newInstance("PelletGun"))
-for (let index = 0; index <= 4; index++) {
-    objects.tell(objects.newInstance("Astroid"), "spawn", randint(0, scene.screenWidth()), randint(0, scene.screenHeight()), randint(-20, 20), randint(-20, 20), randint(0, 100))
-}
 game.onUpdate(function () {
     if (controller.left.isPressed() || controller.right.isPressed() || (controller.up.isPressed() || controller.down.isPressed())) {
         objects.tell(ship, "flyToward", Math.map(controller.dx(), -3, 3, -1, 1), Math.map(controller.dy(), -3, 3, 1, -1))
     }
-    if (objects.getAllInstancesOf("Astroid").length == 0) {
+    if (objects.getAllInstancesOf("Astroid").length == 0 && gameLoaded) {
         info.setScore(info.score() + 100)
         music.stopAllSounds()
         game.setGameOverPlayable(true, music.createSong(assets.song`victory`), true)
         game.gameOver(true)
+    }
+})
+game.onUpdateInterval(2000, function () {
+    if (!(gameLoaded) && game.runtime() > 500) {
+        ship = objects.ask(objects.newInstance("Ship"), "spawn")
+        objects.tell(ship, "equip", objects.newInstance("PelletGun"))
+        for (let index2 = 0; index2 <= 4; index2++) {
+            objects.tell(objects.newInstance("Astroid"), "spawn", randint(0, scene.screenWidth()), randint(0, scene.screenHeight()), randint(-20, 20), randint(-20, 20), randint(0, 100))
+        }
+        gameLoaded = true
     }
 })
