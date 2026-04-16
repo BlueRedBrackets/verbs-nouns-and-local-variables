@@ -12,7 +12,7 @@ function defineWeapons () {
     })
     objects.defineNoun("Laser", function () {
         objects.defineAritousVerb("spawn", "x, y, direction", function () {
-            objects.setLocalVariable("laserImage", image.create(3, 3))
+            objects.setLocal("laserImage", image.create(3, 3))
             objects.asImage(objects.getLocal("laserImage")).fill(1)
             objects.setInstanceSprite(sprites.create(objects.getLocal("laserImage"), SpriteKind.Projectile), objects.self())
             objects.getSpriteFromNoun(objects.self()).sy = 50
@@ -32,7 +32,7 @@ function defineWeapons () {
     objects.defineNoun("Pellet", function () {
         objects.defineAritousVerb("spawn", "x, y, direction, damage", function () {
             objects.setInstanceSprite(sprites.create(assets.image`pixel`, SpriteKind.Projectile), objects.self())
-            objects.setLocalVariable("speed", 100)
+            objects.setLocal("speed", 100)
             objects.setInstanceProperty(objects.self(), "damage", objects.getLocal("damage"))
             objects.getSpriteFromNoun(objects.self()).image.fill(1)
             objects.getSpriteFromNoun(objects.self()).x = objects.getLocal("x")
@@ -50,14 +50,58 @@ controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
 function isAnyDirectionPressed () {
     return controller.left.isPressed() || (controller.right.isPressed() || (controller.up.isPressed() || controller.down.isPressed()))
 }
-function defineNouns () {
+function defineEngine () {
+    objects.defineNoun("Engine", function () {
+        objects.defineAritousVerb("spawn", "power, maxFuel, ship", function () {
+            objects.setInstanceProperty(objects.self(), "power", objects.getLocal("power"))
+            objects.setInstanceProperty(objects.self(), "ship", objects.getLocal("ship"))
+            objects.setInstanceProperty(objects.self(), "maxFuel", objects.getLocal("maxFuel"))
+            objects.setInstanceProperty(objects.self(), "fuel", objects.getLocal("maxFuel"))
+            objects.setState(objects.self(), "idle")
+            objects.answer(objects.self())
+        })
+        objects.onTickInState(300, "running", function () {
+            music.play(music.createSoundEffect(WaveShape.Noise, 276, 320, 28, 45, 300, SoundExpressionEffect.None, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
+        })
+        objects.onTickInState(objects.everyFrame(), "running", function () {
+            if (objects.ask(objects.self(), "haveFuel?")) {
+                objects.setInstanceProperty(objects.self(), "fuel", objects.getInstanceProperty(objects.self(), "fuel") - 1)
+                objects.tell(objects.getInstanceProperty(objects.self(), "ship"), "spawnEngineParticles")
+            } else {
+                objects.tell(objects.self(), "cut")
+            }
+        })
+        objects.onEnterState("idle", function () {
+            objects.setInstanceProperty(objects.self(), "thrust", 0)
+        })
+        objects.onEnterState("running", function () {
+            objects.setInstanceProperty(objects.self(), "thrust", objects.getInstanceProperty(objects.self(), "power"))
+        })
+        objects.defineNullaryVerb("haveFuel?", function () {
+            objects.answer(objects.getInstanceProperty(objects.self(), "fuel") > 0)
+        })
+        objects.defineNullaryVerb("fire", function () {
+            if (objects.ask(objects.self(), "haveFuel?")) {
+                objects.setState(objects.self(), "running")
+            }
+        })
+        objects.defineNullaryVerb("cut", function () {
+            objects.setState(objects.self(), "idle")
+        })
+    })
+}
+function degreesToRadians (degrees: number) {
+    return degrees * Math.PI / 180
+}
+info.onLifeZero(function () {
+    music.stopAllSounds()
+    game.reset()
+})
+function defineShip () {
     objects.defineNoun("Ship", function () {
         objects.defineNullaryVerb("spawn", function () {
             objects.setInstanceSprite(sprites.create(assets.image`ship`, SpriteKind.Player), objects.self())
-            objects.setInstanceProperty(objects.self(), "enginePowerOn", false)
-            objects.setInstanceProperty(objects.self(), "maxFuel", 300)
-            objects.setInstanceProperty(objects.self(), "fuel", objects.getInstanceProperty(objects.self(), "maxFuel"))
-            objects.setInstanceProperty(objects.self(), "acceleration", 2)
+            objects.setInstanceProperty(objects.self(), "engine", objects.ask(objects.newInstance("Engine"), "spawn", 2, 300, objects.self()))
             objects.setInstanceProperty(objects.self(), "fuelBar", sprites.create(image.create(scene.screenWidth(), 4), SpriteKind.HUD))
             objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).image.fill(1)
             objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).x = scene.screenWidth() / 2
@@ -67,13 +111,17 @@ function defineNouns () {
             info.setLife(25)
             objects.answer(objects.self())
         })
-        objects.defineAritousVerb("tick", "controllerX, controllerY", function () {
-            if (isAnyDirectionPressed() && objects.getInstanceProperty(objects.self(), "fuel")) {
-                objects.tell(objects.self(), "flyToward", objects.getLocal("controllerX"), objects.getLocal("controllerY"))
+        objects.onTick(objects.everyFrame(), function () {
+            objects.setLocal("controllerX", Math.map(controller.dx(), -3, 3, -1, 1))
+            objects.setLocal("controllerY", Math.map(controller.dy(), -3, 3, 1, -1))
+            if (isAnyDirectionPressed()) {
+                if (objects.ask(objects.getInstanceProperty(objects.self(), "engine"), "haveFuel?")) {
+                    objects.tell(objects.self(), "flyToward", objects.getLocal("controllerX"), objects.getLocal("controllerY"))
+                }
             } else {
-                objects.setInstanceProperty(objects.self(), "enginePowerOn", false)
+                objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "cut")
             }
-            objects.getInstanceProperty(objects.self(), "fuelBar").sx = objects.getInstanceProperty(objects.self(), "fuel") / objects.getInstanceProperty(objects.self(), "maxFuel")
+            objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).sx = objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "fuel") / objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "maxFuel")
         })
         objects.defineAritousVerb("equip", "weapon", function () {
             objects.setInstanceProperty(objects.self(), "weapon", objects.getLocal("weapon"))
@@ -86,24 +134,14 @@ function defineNouns () {
             objects.tell(objects.getInstanceProperty(objects.self(), "weapon"), "shoot", objects.getSpriteFromNoun(objects.self()).x, objects.getSpriteFromNoun(objects.self()).y, objects.getSpriteFromNoun(objects.self()).rotation)
         })
         objects.defineAritousVerb("flyToward", "dx, dy", function () {
-            objects.setLocalVariable("radians", Math.atan2(objects.getLocal("dx"), objects.getLocal("dy")))
-            objects.setLocalVariable("lerped", objects.lerpRadians(objects.getSpriteFromNoun(objects.self()).rotation, objects.getLocal("radians"), 0.1))
-            objects.setLocalVariable("howClose", Math.abs(objects.getSpriteFromNoun(objects.self()).rotation - objects.getLocal("lerped")))
+            objects.setLocal("radians", Math.atan2(objects.getLocal("dx"), objects.getLocal("dy")))
+            objects.setLocal("lerped", objects.lerpRadians(objects.getSpriteFromNoun(objects.self()).rotation, objects.getLocal("radians"), 0.1))
+            objects.setLocal("howClose", Math.abs(objects.getSpriteFromNoun(objects.self()).rotation - objects.getLocal("lerped")))
             objects.getSpriteFromNoun(objects.self()).rotation = objects.getLocal("lerped")
-            if (objects.getInstanceProperty(objects.self(), "enginePowerOn") || objects.getLocal("howClose") < 0.05) {
-                if (objects.getInstanceProperty(objects.self(), "fuel") > 0) {
-                    objects.setInstanceProperty(objects.self(), "enginePowerOn", true)
-                    objects.setLocalVariable("dvx", objects.getLocal("dx") * objects.getInstanceProperty(objects.self(), "acceleration"))
-                    objects.setLocalVariable("dvy", objects.getLocal("dy") * -1 * objects.getInstanceProperty(objects.self(), "acceleration"))
-                    objects.getSpriteFromNoun(objects.self()).vx += objects.getLocal("dvx")
-                    objects.getSpriteFromNoun(objects.self()).vy += objects.getLocal("dvy")
-                    objects.setInstanceProperty(objects.self(), "fuel", objects.getInstanceProperty(objects.self(), "fuel") - 1)
-                    objects.tell(objects.self(), "spawnEngineParticles")
-                } else {
-                    music.play(music.createSoundEffect(WaveShape.Triangle, 364, 1, 255, 0, 500, SoundExpressionEffect.Vibrato, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
-                    music.play(music.createSoundEffect(WaveShape.Noise, 101, 1, 63, 0, 1000, SoundExpressionEffect.None, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
-                    objects.setInstanceProperty(objects.self(), "enginePowerOn", false)
-                }
+            if (objects.getLocal("howClose") < 0.05) {
+                objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "fire")
+                objects.getSpriteFromNoun(objects.self()).vx += objects.getLocal("dx") * objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "thrust")
+                objects.getSpriteFromNoun(objects.self()).vy += objects.getLocal("dy") * -1 * objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "thrust")
             }
         })
         objects.defineNullaryVerb("cutEngines", function () {
@@ -111,28 +149,21 @@ function defineNouns () {
         })
         objects.defineAritousVerb("spawnEngineParticles", "", function () {
             for (let index = 0; index <= 9; index++) {
-                objects.setLocalVariable("particleXOffset", randint(-2, 2))
-                objects.setLocalVariable("particleYOffset", randint(8, 10))
-                objects.setLocalVariable("particleXRotated", objects.getLocal("particleXOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation) - objects.getLocal("particleYOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation))
-                objects.setLocalVariable("particleYRotated", objects.getLocal("particleXOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation) + objects.getLocal("particleYOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation))
-                objects.setLocalVariable("particleX", objects.getSpriteFromNoun(objects.self()).x + objects.getLocal("particleXRotated"))
-                objects.setLocalVariable("particleY", objects.getSpriteFromNoun(objects.self()).y + objects.getLocal("particleYRotated"))
-                objects.setLocalVariable("particleDirection", degreesToRadians(objects.getSpriteFromNoun(objects.self()).rotationDegrees + randint(165, 195)))
-                objects.setLocalVariable("particleVx", Math.sin(objects.getLocal("particleDirection")) * 20)
-                objects.setLocalVariable("particleVy", Math.cos(objects.getLocal("particleDirection")) * -20)
-                objects.setLocalVariable("particleLifespan", randint(50, 150))
+                objects.setLocal("particleXOffset", randint(-2, 2))
+                objects.setLocal("particleYOffset", randint(8, 10))
+                objects.setLocal("particleXRotated", objects.getLocal("particleXOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation) - objects.getLocal("particleYOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation))
+                objects.setLocal("particleYRotated", objects.getLocal("particleXOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation) + objects.getLocal("particleYOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation))
+                objects.setLocal("particleX", objects.getSpriteFromNoun(objects.self()).x + objects.getLocal("particleXRotated"))
+                objects.setLocal("particleY", objects.getSpriteFromNoun(objects.self()).y + objects.getLocal("particleYRotated"))
+                objects.setLocal("particleDirection", degreesToRadians(objects.getSpriteFromNoun(objects.self()).rotationDegrees + randint(165, 195)))
+                objects.setLocal("particleVx", Math.sin(objects.getLocal("particleDirection")) * 20)
+                objects.setLocal("particleVy", Math.cos(objects.getLocal("particleDirection")) * -20)
+                objects.setLocal("particleLifespan", randint(50, 150))
                 objects.tell(objects.newInstance("Particle"), "spawn", 1, objects.getLocal("particleX"), objects.getLocal("particleY"), objects.getLocal("particleVx"), objects.getLocal("particleVy"), objects.getLocal("particleLifespan"))
             }
         })
     })
 }
-function degreesToRadians (degrees: number) {
-    return degrees * Math.PI / 180
-}
-info.onLifeZero(function () {
-    music.stopAllSounds()
-    game.reset()
-})
 sprites.onOverlap(SpriteKind.Projectile, SpriteKind.Enemy, function (sprite, otherSprite) {
     sprite.setKind(SpriteKind.StruckProjectile)
     objects.tell(objects.getNounFromSprite(otherSprite), "struckBy", objects.getNounFromSprite(sprite))
@@ -160,7 +191,7 @@ sprites.onOverlap(SpriteKind.Player, SpriteKind.Enemy, function (sprite, otherSp
 function defineEnemies () {
     objects.defineNoun("Astroid", function () {
         objects.defineAritousVerb("spawn", "x, y, vx, vy, size", function () {
-            objects.setLocalVariable("astroidImages", [assets.image`astroid-a`, assets.image`astroid-b`, assets.image`astroid-c`])
+            objects.setLocal("astroidImages", [assets.image`astroid-a`, assets.image`astroid-b`, assets.image`astroid-c`])
             objects.setInstanceSprite(sprites.create(objects.asArray(objects.getLocal("astroidImages"))._pickRandom(), SpriteKind.Enemy), objects.self())
             objects.getSpriteFromNoun(objects.self()).setStayInScreen(true)
             objects.getSpriteFromNoun(objects.self()).setBounceOnWall(true)
@@ -316,26 +347,28 @@ scene.setBackgroundImage(img`
     `)
 music.stopAllSounds()
 music.play(music.createSong(assets.song`theme`), music.PlaybackMode.LoopingInBackground)
-defineNouns()
+defineEngine()
+defineShip()
 defineWeapons()
 defineMisc()
 defineEnemies()
 ship = objects.ask(objects.newInstance("Ship"), "spawn")
 objects.tell(ship, "equip", objects.newInstance("PelletGun"))
-for (let index2 = 0; index2 <= 4; index2++) {
-    objects.tell(objects.newInstance("Astroid"), "spawn", randint(0, scene.screenWidth()), randint(0, scene.screenHeight()), randint(-20, 20), randint(-20, 20), randint(0, 100))
-}
+objects.defineLocalFrame(function () {
+    for (let index2 = 0; index2 <= 4; index2++) {
+        objects.setLocal("x", randint(0, scene.screenWidth()))
+        objects.setLocal("y", randint(0, scene.screenHeight()))
+        objects.setLocal("vx", randint(-20, 20))
+        objects.setLocal("vy", randint(-20, 20))
+        objects.setLocal("size", randint(0, 100))
+        objects.tell(objects.newInstance("Astroid"), "spawn", objects.getLocal("x"), objects.getLocal("y"), objects.getLocal("vx"), objects.getLocal("vy"), objects.getLocal("size"))
+    }
+})
 game.onUpdate(function () {
-    objects.tell(ship, "tick", Math.map(controller.dx(), -3, 3, -1, 1), Math.map(controller.dy(), -3, 3, 1, -1))
     if (objects.getAllInstancesOf("Astroid").length == 0) {
         info.setScore(info.score() + 100)
         music.stopAllSounds()
         game.setGameOverPlayable(true, music.createSong(assets.song`victory`), true)
         game.gameOver(true)
-    }
-})
-game.onUpdateInterval(200, function () {
-    if (objects.getInstanceProperty(ship, "enginePowerOn")) {
-        music.play(music.createSoundEffect(WaveShape.Noise, 57, 1, 107, 0, 500, SoundExpressionEffect.None, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
     }
 })
