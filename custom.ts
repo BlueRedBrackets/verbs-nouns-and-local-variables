@@ -259,25 +259,6 @@ namespace objects {
     /**
     * Creates a new instance of a noun.
     */
-    //% blockId="new_instance"
-    //% group="Instances"
-    //% block="new $nounName"
-    //% nounName.shadow="objects_noun_picker"
-    //% blockSetVariable="myNoun"
-    export function newInstance(nounName: string): any {
-        if (nounRegistry[nounName]) {
-            let nounDef = nounRegistry[nounName];
-            let it = new NounInstance(nounDef.name, nounDef._verbs);
-            allInstances.push(it);
-            _executeVerb(it, "__onStart", []);
-            return it;
-        }
-        throw `${nounName} is not defined`;
-    }
-
-    /**
-    * Creates a new instance of a noun.
-    */
     //% blockId="new_instance_block"
     //% group="Instances"
     //% block="new $nounName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
