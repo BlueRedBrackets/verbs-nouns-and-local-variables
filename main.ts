@@ -2,60 +2,122 @@ namespace SpriteKind {
     export const Particle = SpriteKind.create()
     export const StruckProjectile = SpriteKind.create()
     export const StruckEnemy = SpriteKind.create()
-    export const HUD = SpriteKind.create()
+    export const AvionicsDisplay = SpriteKind.create()
+}
+function hypotenuse (a: number, b: number) {
+    return Math.sqrt(a ** 2 + b ** 2)
+}
+function rotatedVector (x: number, y: number, rotateByRadians: number) {
+    toUnitVector(toRadians(x, y) + rotateByRadians)
+    objects.setLocal("__rotatedVector_hypotenuse", Math.abs(hypotenuse(x, y)))
+    objects.setLocal("__resultX", objects.getLocal("__resultX") * objects.getLocal("__rotatedVector_hypotenuse"))
+    objects.setLocal("__resultY", objects.getLocal("__resultY") * objects.getLocal("__rotatedVector_hypotenuse"))
+}
+function rotatedRadians (radians: number, rotateByRadians: number) {
+    return Math.abs(radians + rotateByRadians) % (2 * Math.PI)
 }
 function defineWeapons () {
-    objects.defineNoun("LaserBeam", function () {
-        objects.defineAritousVerb("shoot", "x, y, direction", function () {
-            objects.tell(objects.newInstance("Laser"), "spawn", objects.getLocal("x"), objects.getLocal("y"), objects.getLocal("direction"))
-        })
-    })
-    objects.defineNoun("Laser", function () {
-        objects.defineAritousVerb("spawn", "x, y, direction", function () {
-            objects.setLocal("laserImage", image.create(3, 3))
-            objects.asImage(objects.getLocal("laserImage")).fill(1)
-            objects.setInstanceSprite(sprites.create(objects.getLocal("laserImage"), SpriteKind.Projectile), objects.self())
-            objects.getSpriteFromNoun(objects.self()).sy = 50
-            objects.getSpriteFromNoun(objects.self()).x = objects.getLocal("x")
-            objects.getSpriteFromNoun(objects.self()).y = objects.getLocal("y")
-            objects.getSpriteFromNoun(objects.self()).rotation = objects.getLocal("direction")
-            objects.getSpriteFromNoun(objects.self()).lifespan = 1000
-            objects.answer(objects.self())
-        })
-    })
-    objects.defineNoun("PelletGun", function () {
-        objects.defineAritousVerb("shoot", "x, y, direction", function () {
-            music.play(music.createSoundEffect(WaveShape.Noise, 2252, 627, 255, 0, 50, SoundExpressionEffect.Warble, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
-            objects.tell(objects.newInstance("Pellet"), "spawn", objects.getLocal("x"), objects.getLocal("y"), objects.getLocal("direction"), 10)
-        })
-    })
     objects.defineNoun("Pellet", function () {
-        objects.defineAritousVerb("spawn", "x, y, direction, damage", function () {
-            objects.setInstanceSprite(sprites.create(assets.image`pixel`, SpriteKind.Projectile), objects.self())
+        objects.defineNew("x, y, direction, damage", function () {
             objects.setLocal("speed", 100)
-            objects.setInstanceProperty(objects.self(), "damage", objects.getLocal("damage"))
-            objects.getSpriteFromNoun(objects.self()).image.fill(1)
+            objects.setInstanceSprite(sprites.create(assets.image`pixel`, SpriteKind.Projectile), objects.self())
             objects.getSpriteFromNoun(objects.self()).x = objects.getLocal("x")
             objects.getSpriteFromNoun(objects.self()).y = objects.getLocal("y")
-            objects.getSpriteFromNoun(objects.self()).vx = Math.sin(objects.getLocal("direction")) * objects.getLocal("speed")
-            objects.getSpriteFromNoun(objects.self()).vy = Math.cos(objects.getLocal("direction")) * -1 * objects.getLocal("speed")
+            toUnitVector(objects.getLocal("direction"))
+            objects.getSpriteFromNoun(objects.self()).vx = objects.getLocal("__resultX") * objects.getLocal("speed")
+            objects.getSpriteFromNoun(objects.self()).vy = objects.getLocal("__resultY") * objects.getLocal("speed")
             objects.getSpriteFromNoun(objects.self()).lifespan = 5000
-            objects.answer(objects.self())
+            objects.getSpriteFromNoun(objects.self()).image.fill(1)
+            music.play(music.createSoundEffect(WaveShape.Noise, 2252, 627, 255, 0, 50, SoundExpressionEffect.Warble, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
         })
     })
 }
-controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
-    objects.tell(ship, "shoot")
-})
+function toUnitVector (directionRadians: number) {
+    objects.setLocal("__resultX", Math.cos(directionRadians))
+    objects.setLocal("__resultY", Math.sin(directionRadians))
+}
+function definePilot () {
+    objects.defineNoun("AvionicsDisplay", function () {
+        objects.defineNew("", function () {
+            objects.setInstanceProperty(objects.self(), "hullIndicator", objects.newNewInstance("BarIndicator", 0, 0, 64, 4, true))
+            objects.setInstanceProperty(objects.self(), "fuelIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, 0, 64, 4, false))
+        })
+        objects.defineAritousVerb("updateFuel", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "fuelIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+        objects.defineAritousVerb("updateHull", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "hullIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+    })
+    objects.defineNoun("Pilot", function () {
+        objects.defineNew("flightControl, weaponsControl", function () {
+        	
+        })
+        objects.onTick(objects.everyFrame(), function () {
+            objects.setLocal("controllerX", Math.map(controller.dx(), -3, 3, -1, 1))
+            objects.setLocal("controllerY", Math.map(controller.dy(), -3, 3, 1, -1))
+            if (isAnyDirectionPressed()) {
+                objects.tell(objects.getInstanceProperty(objects.self(), "flightControl"), "flyToward", objects.getLocal("controllerX"), objects.getLocal("controllerY"))
+            } else {
+                objects.tell(objects.getInstanceProperty(objects.self(), "flightControl"), "standby")
+            }
+            if (controller.A.isPressed()) {
+                objects.tell(objects.getInstanceProperty(objects.self(), "weaponsControl"), "fire")
+            }
+        })
+    })
+}
+function differenceInRadians (radians: number, targetRadians: number) {
+    objects.setLocal("__differenceInRadians_result", Math.abs(radians - targetRadians) % (2 * Math.PI))
+    if (objects.getLocal("__differenceInRadians_result") > Math.PI) {
+        objects.setLocal("__differenceInRadians_result", 2 * Math.PI - objects.getLocal("__differenceInRadians_result"))
+    }
+    return objects.getLocal("__differenceInRadians_result")
+}
+function defineHull () {
+    objects.defineNoun("Hull", function () {
+        objects.defineNew("avionicsDisplay", function () {
+            objects.setInstanceProperty(objects.self(), "maxStrength", 100)
+            objects.setInstanceProperty(objects.self(), "strength", objects.getInstanceProperty(objects.self(), "maxStrength"))
+            objects.tell(objects.getLocal("avionicsDisplay"), "updateHull", objects.getInstanceProperty(objects.self(), "strength"), objects.getInstanceProperty(objects.self(), "maxStrength"))
+        })
+        objects.defineAritousVerb("damage", "amount", function () {
+            objects.setInstanceProperty(objects.self(), "strength", objects.getInstanceProperty(objects.self(), "strength") - objects.getLocal("amount"))
+            objects.tell(objects.getLocal("avionicsDisplay"), "updateHull", objects.getInstanceProperty(objects.self(), "strength"), objects.getInstanceProperty(objects.self(), "maxStrength"))
+        })
+    })
+}
 function isAnyDirectionPressed () {
     return controller.left.isPressed() || (controller.right.isPressed() || (controller.up.isPressed() || controller.down.isPressed()))
 }
+function toRadians (x: number, y: number) {
+    return Math.atan2(y * -1, x)
+}
+function defineFlightControl () {
+    objects.defineNoun("FlightControl", function () {
+        objects.defineNew("ship", function () {
+            objects.setInstanceProperty(objects.self(), "engine", objects.newNewInstance("Engine", 2, 300, objects.getLocal("ship")))
+            objects.setInstanceProperty(objects.self(), "attitude", objects.getSpriteFromNoun(objects.getLocal("ship")).rotation)
+        })
+        objects.defineNullaryVerb("standby", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "stop")
+        })
+        objects.defineAritousVerb("flyToward", "dx, dy", function () {
+            if (objects.ask(objects.getInstanceProperty(objects.self(), "engine"), "haveFuel?")) {
+                objects.setLocal("targetAttitude", toRadians(objects.getLocal("dx"), objects.getLocal("dy")))
+                objects.setInstanceProperty(objects.self(), "attitude", objects.lerpRadians(objects.getInstanceProperty(objects.self(), "attitude"), objects.getLocal("targetAttitude"), 0.1))
+                objects.tell(objects.getInstanceProperty(objects.self(), "ship"), "reorient", objects.getInstanceProperty(objects.self(), "attitude"))
+                if (differenceInRadians(objects.getInstanceProperty(objects.self(), "attitude"), objects.getLocal("targetAttitude")) <= Math.PI / 16) {
+                    objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "start")
+                }
+            }
+        })
+    })
+}
 function defineEngine () {
     objects.defineNoun("Engine", function () {
-        objects.defineAritousVerb("spawn", "power, maxFuel, ship", function () {
-            objects.setInstanceProperty(objects.self(), "power", objects.getLocal("power"))
-            objects.setInstanceProperty(objects.self(), "ship", objects.getLocal("ship"))
-            objects.setInstanceProperty(objects.self(), "maxFuel", objects.getLocal("maxFuel"))
+        objects.defineNew("power, maxFuel, ship", function () {
+            objects.setInstanceProperty(objects.self(), "avionicsDisplay", objects.getInstanceProperty(objects.getLocal("ship"), "avionicsDisplay"))
             objects.setInstanceProperty(objects.self(), "fuel", objects.getLocal("maxFuel"))
             objects.setState(objects.self(), "idle")
             objects.answer(objects.self())
@@ -64,29 +126,24 @@ function defineEngine () {
             music.play(music.createSoundEffect(WaveShape.Noise, 276, 320, 28, 45, 300, SoundExpressionEffect.None, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
         })
         objects.onTickInState(objects.everyFrame(), "running", function () {
-            if (objects.ask(objects.self(), "haveFuel?")) {
+            if (objects.asBinary(objects.ask(objects.self(), "haveFuel?"))) {
                 objects.setInstanceProperty(objects.self(), "fuel", objects.getInstanceProperty(objects.self(), "fuel") - 1)
-                objects.tell(objects.getInstanceProperty(objects.self(), "ship"), "spawnEngineParticles")
+                objects.tell(objects.getInstanceProperty(objects.self(), "ship"), "thrust", objects.getInstanceProperty(objects.self(), "power"))
+                objects.tell(objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "ship"), "avionicsDisplay"), "updateFuel", objects.getInstanceProperty(objects.self(), "fuel"), objects.getInstanceProperty(objects.self(), "maxFuel"))
             } else {
-                objects.tell(objects.self(), "cut")
+                objects.tell(objects.self(), "stop")
             }
         })
-        objects.onEnterState("idle", function () {
-            objects.setInstanceProperty(objects.self(), "thrust", 0)
-        })
-        objects.onEnterState("running", function () {
-            objects.setInstanceProperty(objects.self(), "thrust", objects.getInstanceProperty(objects.self(), "power"))
-        })
-        objects.defineNullaryVerb("haveFuel?", function () {
-            objects.answer(objects.getInstanceProperty(objects.self(), "fuel") > 0)
-        })
-        objects.defineNullaryVerb("fire", function () {
-            if (objects.ask(objects.self(), "haveFuel?")) {
+        objects.defineNullaryVerb("start", function () {
+            if (objects.asBinary(objects.ask(objects.self(), "haveFuel?"))) {
                 objects.setState(objects.self(), "running")
             }
         })
-        objects.defineNullaryVerb("cut", function () {
+        objects.defineNullaryVerb("stop", function () {
             objects.setState(objects.self(), "idle")
+        })
+        objects.defineNullaryVerb("haveFuel?", function () {
+            objects.answer(objects.getInstanceProperty(objects.self(), "fuel") > 0)
         })
     })
 }
@@ -97,70 +154,59 @@ info.onLifeZero(function () {
     music.stopAllSounds()
     game.reset()
 })
+function defineWeaponsControl () {
+    objects.defineNoun("WeaponsControl", function () {
+        objects.defineNew("ship", function () {
+            objects.setInstanceProperty(objects.self(), "ammunition", "Pellet")
+        })
+        objects.defineAritousVerb("fire", "", function () {
+            objects.setLocal("shipX", objects.getSpriteFromNoun(objects.getInstanceProperty(objects.self(), "ship")).x)
+            objects.setLocal("shipY", objects.getSpriteFromNoun(objects.getInstanceProperty(objects.self(), "ship")).y)
+            objects.setLocal("shipRadians", objects.getSpriteFromNoun(objects.getInstanceProperty(objects.self(), "ship")).rotation)
+            objects.spawn(objects.getInstanceProperty(objects.self(), "ammunition"), objects.getLocal("shipX"), objects.getLocal("shipY"), objects.getLocal("shipRadians"), 10)
+        })
+    })
+}
 function defineShip () {
     objects.defineNoun("Ship", function () {
-        objects.defineNullaryVerb("spawn", function () {
+        objects.defineNew("", function () {
             objects.setInstanceSprite(sprites.create(assets.image`ship`, SpriteKind.Player), objects.self())
-            objects.setInstanceProperty(objects.self(), "engine", objects.ask(objects.newInstance("Engine"), "spawn", 2, 300, objects.self()))
-            objects.setInstanceProperty(objects.self(), "fuelBar", sprites.create(image.create(scene.screenWidth(), 4), SpriteKind.HUD))
-            objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).image.fill(1)
-            objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).x = scene.screenWidth() / 2
-            objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).y = scene.screenHeight() - 4
+            objects.getSpriteFromNoun(objects.self()).rotationDegrees = -90
             objects.getSpriteFromNoun(objects.self()).setStayInScreen(true)
             objects.getSpriteFromNoun(objects.self()).setBounceOnWall(true)
-            info.setLife(25)
-            objects.answer(objects.self())
+            objects.setInstanceProperty(objects.self(), "avionicsDisplay", objects.newNewInstance("AvionicsDisplay"))
+            objects.setInstanceProperty(objects.self(), "flightControl", objects.newNewInstance("FlightControl", objects.self()))
+            objects.setInstanceProperty(objects.self(), "weaponsControl", objects.newNewInstance("WeaponsControl", objects.self()))
+            objects.setInstanceProperty(objects.self(), "pilot", objects.newNewInstance("Pilot", objects.getInstanceProperty(objects.self(), "flightControl"), objects.getInstanceProperty(objects.self(), "weaponsControl")))
+            objects.setInstanceProperty(objects.self(), "hull", objects.newNewInstance("Hull", objects.getInstanceProperty(objects.self(), "avionicsDisplay")))
         })
-        objects.onTick(objects.everyFrame(), function () {
-            objects.setLocal("controllerX", Math.map(controller.dx(), -3, 3, -1, 1))
-            objects.setLocal("controllerY", Math.map(controller.dy(), -3, 3, 1, -1))
-            if (isAnyDirectionPressed()) {
-                if (objects.ask(objects.getInstanceProperty(objects.self(), "engine"), "haveFuel?")) {
-                    objects.tell(objects.self(), "flyToward", objects.getLocal("controllerX"), objects.getLocal("controllerY"))
-                }
-            } else {
-                objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "cut")
+        objects.defineAritousVerb("reorient", "radians", function () {
+            objects.getSpriteFromNoun(objects.self()).rotation = objects.getLocal("radians")
+        })
+        objects.defineAritousVerb("thrust", "power", function () {
+            toUnitVector(objects.getSpriteFromNoun(objects.self()).rotation)
+            objects.getSpriteFromNoun(objects.self()).vx += objects.getLocal("__resultX") * objects.getLocal("power")
+            objects.getSpriteFromNoun(objects.self()).vy += objects.getLocal("__resultY") * objects.getLocal("power")
+            objects.setLocal("particleSpeed", objects.getLocal("power") * 50)
+            for (let index = 0; index <= 4; index++) {
+                rotatedVector(-8, randint(-2, 2), objects.getSpriteFromNoun(objects.self()).rotation)
+                objects.setLocal("xSpawn", objects.getSpriteFromNoun(objects.self()).x + objects.getLocal("__resultX"))
+                objects.setLocal("ySpawn", objects.getSpriteFromNoun(objects.self()).y + objects.getLocal("__resultY"))
+                toUnitVector(objects.getSpriteFromNoun(objects.self()).rotation)
+                objects.setLocal("xVelocity", objects.getLocal("__resultX") * objects.getLocal("particleSpeed") * (randint(8, 11) / -10))
+                objects.setLocal("yVelocity", objects.getLocal("__resultY") * objects.getLocal("particleSpeed") * (randint(8, 11) / -10))
+                objects.tell(objects.newInstance("Particle"), "spawn", 1, objects.getLocal("xSpawn"), objects.getLocal("ySpawn"), objects.getLocal("xVelocity"), objects.getLocal("yVelocity"), randint(100, 300))
             }
-            objects.asSprite(objects.getInstanceProperty(objects.self(), "fuelBar")).sx = objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "fuel") / objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "maxFuel")
         })
         objects.defineAritousVerb("equip", "weapon", function () {
             objects.setInstanceProperty(objects.self(), "weapon", objects.getLocal("weapon"))
             objects.setInstanceProperty(objects.getLocal("weapon"), "ship", objects.self())
         })
-        objects.defineAritousVerb("struckBy", "astroid", function () {
-            info.setLife(info.life() - objects.getInstanceProperty(objects.getLocal("astroid"), "size"))
+        objects.defineAritousVerb("struck", "damage", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "hull"), "damage", objects.getLocal("damage") * -1)
         })
-        objects.defineNullaryVerb("shoot", function () {
+        objects.defineNullaryVerb("fire", function () {
             objects.tell(objects.getInstanceProperty(objects.self(), "weapon"), "shoot", objects.getSpriteFromNoun(objects.self()).x, objects.getSpriteFromNoun(objects.self()).y, objects.getSpriteFromNoun(objects.self()).rotation)
-        })
-        objects.defineAritousVerb("flyToward", "dx, dy", function () {
-            objects.setLocal("radians", Math.atan2(objects.getLocal("dx"), objects.getLocal("dy")))
-            objects.setLocal("lerped", objects.lerpRadians(objects.getSpriteFromNoun(objects.self()).rotation, objects.getLocal("radians"), 0.1))
-            objects.setLocal("howClose", Math.abs(objects.getSpriteFromNoun(objects.self()).rotation - objects.getLocal("lerped")))
-            objects.getSpriteFromNoun(objects.self()).rotation = objects.getLocal("lerped")
-            if (objects.getLocal("howClose") < 0.05) {
-                objects.tell(objects.getInstanceProperty(objects.self(), "engine"), "fire")
-                objects.getSpriteFromNoun(objects.self()).vx += objects.getLocal("dx") * objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "thrust")
-                objects.getSpriteFromNoun(objects.self()).vy += objects.getLocal("dy") * -1 * objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "engine"), "thrust")
-            }
-        })
-        objects.defineNullaryVerb("cutEngines", function () {
-            objects.setInstanceProperty(objects.self(), "enginePowerOn", false)
-        })
-        objects.defineAritousVerb("spawnEngineParticles", "", function () {
-            for (let index = 0; index <= 9; index++) {
-                objects.setLocal("particleXOffset", randint(-2, 2))
-                objects.setLocal("particleYOffset", randint(8, 10))
-                objects.setLocal("particleXRotated", objects.getLocal("particleXOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation) - objects.getLocal("particleYOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation))
-                objects.setLocal("particleYRotated", objects.getLocal("particleXOffset") * Math.sin(objects.getSpriteFromNoun(objects.self()).rotation) + objects.getLocal("particleYOffset") * Math.cos(objects.getSpriteFromNoun(objects.self()).rotation))
-                objects.setLocal("particleX", objects.getSpriteFromNoun(objects.self()).x + objects.getLocal("particleXRotated"))
-                objects.setLocal("particleY", objects.getSpriteFromNoun(objects.self()).y + objects.getLocal("particleYRotated"))
-                objects.setLocal("particleDirection", degreesToRadians(objects.getSpriteFromNoun(objects.self()).rotationDegrees + randint(165, 195)))
-                objects.setLocal("particleVx", Math.sin(objects.getLocal("particleDirection")) * 20)
-                objects.setLocal("particleVy", Math.cos(objects.getLocal("particleDirection")) * -20)
-                objects.setLocal("particleLifespan", randint(50, 150))
-                objects.tell(objects.newInstance("Particle"), "spawn", 1, objects.getLocal("particleX"), objects.getLocal("particleY"), objects.getLocal("particleVx"), objects.getLocal("particleVy"), objects.getLocal("particleLifespan"))
-            }
         })
     })
 }
@@ -180,6 +226,22 @@ function defineMisc () {
             objects.getSpriteFromNoun(objects.self()).vy = objects.getLocal("vy")
             objects.getSpriteFromNoun(objects.self()).lifespan = objects.getLocal("lifespan")
             objects.answer(objects.self())
+        })
+    })
+    objects.defineNoun("BarIndicator", function () {
+        objects.defineNew("x, y, width, height, anchorRight", function () {
+            objects.setInstanceSprite(sprites.create(image.create(objects.getLocal("width"), objects.getLocal("height")), SpriteKind.AvionicsDisplay), objects.self())
+            objects.getSpriteFromNoun(objects.self()).x = objects.getLocal("x") + objects.getLocal("width") / 2
+            objects.getSpriteFromNoun(objects.self()).y = objects.getLocal("y") + objects.getLocal("height") / 2
+            objects.getSpriteFromNoun(objects.self()).image.fill(1)
+        })
+        objects.defineAritousVerb("updatePercentage", "current, max", function () {
+            objects.getSpriteFromNoun(objects.self()).image.fillRect(1, 1, objects.getInstanceProperty(objects.self(), "width") - 2, objects.getInstanceProperty(objects.self(), "height") - 2, 0)
+            objects.setLocal("width", objects.getLocal("current") / objects.getLocal("max") * (objects.getInstanceProperty(objects.self(), "width") - 2))
+            objects.getSpriteFromNoun(objects.self()).image.fillRect(1, 1, objects.getLocal("width"), objects.getInstanceProperty(objects.self(), "height") - 2, 1)
+            if (objects.asBinary(objects.getInstanceProperty(objects.self(), "anchorRight"))) {
+                objects.getSpriteFromNoun(objects.self()).image.flipX()
+            }
         })
     })
 }
@@ -209,6 +271,13 @@ function defineEnemies () {
             objects.setInstanceProperty(objects.self(), "health", objects.getInstanceProperty(objects.self(), "health") - objects.getInstanceProperty(objects.getLocal("projectile"), "damage"))
             if (objects.getInstanceProperty(objects.self(), "health") / objects.getInstanceProperty(objects.self(), "maxHealth") <= 0.5) {
                 music.play(music.createSoundEffect(WaveShape.Noise, 496, 1, 255, 0, 1000, SoundExpressionEffect.None, InterpolationCurve.Logarithmic), music.PlaybackMode.InBackground)
+                for (let index2 = 0; index2 <= 14; index2++) {
+                    objects.setLocal("halfWidth", objects.getSpriteFromNoun(objects.self()).width / 2)
+                    objects.setLocal("halfHeight", objects.getSpriteFromNoun(objects.self()).height / 2)
+                    objects.setLocal("particleX", randint(objects.getLocal("halfHeight") * -1, objects.getLocal("halfHeight")) + objects.getSpriteFromNoun(objects.self()).x)
+                    objects.setLocal("particleY", randint(objects.getLocal("halfWidth") * -1, objects.getLocal("halfWidth")) + objects.getSpriteFromNoun(objects.self()).y)
+                    objects.tell(objects.newInstance("Particle"), "spawn", 1, objects.getLocal("particleX"), objects.getLocal("particleY"), randint(-20, 20), randint(-20, 20), randint(300, 600))
+                }
                 if (objects.getInstanceProperty(objects.self(), "size") >= 20) {
                     objects.tell(objects.newInstance("Astroid"), "spawn", objects.getSpriteFromNoun(objects.self()).x, objects.getSpriteFromNoun(objects.self()).y, randint(-20, 20), randint(-20, 20), objects.getInstanceProperty(objects.self(), "size") / 2)
                     objects.tell(objects.newInstance("Astroid"), "spawn", objects.getSpriteFromNoun(objects.self()).x, objects.getSpriteFromNoun(objects.self()).y, randint(-20, 20), randint(-20, 20), objects.getInstanceProperty(objects.self(), "size") / 2)
@@ -222,129 +291,6 @@ function defineEnemies () {
         })
     })
 }
-let ship = 0
-scene.setBackgroundImage(img`
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    ................................................................................................................................................................
-    `)
 music.stopAllSounds()
 music.play(music.createSong(assets.song`theme`), music.PlaybackMode.LoopingInBackground)
 defineEngine()
@@ -352,23 +298,8 @@ defineShip()
 defineWeapons()
 defineMisc()
 defineEnemies()
-ship = objects.ask(objects.newInstance("Ship"), "spawn")
-objects.tell(ship, "equip", objects.newInstance("PelletGun"))
-objects.defineLocalFrame(function () {
-    for (let index2 = 0; index2 <= 4; index2++) {
-        objects.setLocal("x", randint(0, scene.screenWidth()))
-        objects.setLocal("y", randint(0, scene.screenHeight()))
-        objects.setLocal("vx", randint(-20, 20))
-        objects.setLocal("vy", randint(-20, 20))
-        objects.setLocal("size", randint(0, 100))
-        objects.tell(objects.newInstance("Astroid"), "spawn", objects.getLocal("x"), objects.getLocal("y"), objects.getLocal("vx"), objects.getLocal("vy"), objects.getLocal("size"))
-    }
-})
-game.onUpdate(function () {
-    if (objects.getAllInstancesOf("Astroid").length == 0) {
-        info.setScore(info.score() + 100)
-        music.stopAllSounds()
-        game.setGameOverPlayable(true, music.createSong(assets.song`victory`), true)
-        game.gameOver(true)
-    }
-})
+defineWeaponsControl()
+defineFlightControl()
+defineHull()
+definePilot()
+let myNoun = objects.newNewInstance("Ship")

@@ -21,7 +21,7 @@ namespace objects {
         }
 
         getLocal(key: string, value: any) {
-            this.locals[key];
+            return this.locals[key];
         }
     }
 
@@ -34,8 +34,12 @@ namespace objects {
         constructor(name: string, verbs: { [key: string]: VerbDefinition }) {
             this.name = name;
             this._verbs = verbs;
-            this._data = {};
+            this._data = { __state: "" };
             this._sprite = null;
+        }
+
+        toString() {
+            return this.name
         }
     }
 
@@ -67,7 +71,7 @@ namespace objects {
 
     const nounRegistry: { [key: string]: NounDefinition } = {};
     const allInstances: NounInstance[] = [];
-    const _nounDefinitionStack: NounDefinition[] = [];
+    const NOUN_DEFINITION_STACK: NounDefinition[] = [];
     const LOCAL_FRAME_STACK: LocalFrame[] = [];
 
     function peek(stack: any[]): any {
@@ -79,7 +83,10 @@ namespace objects {
 
     function _executeVerb(instance: NounInstance, verbName: string, passedArgs: any[]): any {
         // make function call frame
-        if (!instance || !instance._verbs || !instance._verbs[verbName]) return undefined;
+        if ((!instance || !instance._verbs || !instance._verbs[verbName])) {
+            if (verbName.substr(0, 2) !== "__") throw `${instance} cannot ${verbName} with ${passedArgs}`
+            return undefined
+        } 
         let verbDef = instance._verbs[verbName];
         let locals: { [key: string]: any } = {};
         for (let i = 0; i < verbDef.names.length; i++) {
@@ -113,10 +120,34 @@ namespace objects {
     //% handlerStatement=1
     export function defineNoun(name: string, userDefinition: () => void): void {
         let nounDef = new NounDefinition(name);
-        _nounDefinitionStack.push(nounDef);
+        NOUN_DEFINITION_STACK.push(nounDef);
         userDefinition();
         nounRegistry[name] = nounDef;
-        _nounDefinitionStack.pop();
+        NOUN_DEFINITION_STACK.pop();
+    }
+
+    /**
+     * Defines a verb with arguments.
+     */
+    //% blockId="define_new_block"
+    //% group="Definitions"
+    //% block="define verb new given $argNames"
+    //% argNames.shadow="text"
+    //% argNames.defl="foo, bar"
+    //% handlerStatement=1
+    export function defineNew(argNames: string, definition: () => void): void {
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
+        if (currentNoun) {
+            let parsedNames = argNames.split(",")
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+            currentNoun._verbs["__new"] = new VerbDefinition(function(self: NounInstance) {
+                parsedNames.forEach(function(name) {
+                    setInstanceProperty(self, name, getLocal(name));
+                });
+                definition();
+            }, parsedNames);
+        }
     }
 
     /**
@@ -130,7 +161,7 @@ namespace objects {
     //% argNames.defl="foo, bar"
     //% handlerStatement=1
     export function defineAritousVerb(verbName: string, argNames: string, definition: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun) {
             let parsedNames = argNames.split(",")
                 .map(s => s.trim())
@@ -148,7 +179,7 @@ namespace objects {
     //% verbName.shadow="objects_verb_picker"
     //% handlerStatement=1
     export function defineNullaryVerb(verbName: string, definition: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun) {
             currentNoun._verbs[verbName] = new VerbDefinition(definition, []);
         }
@@ -208,7 +239,7 @@ namespace objects {
     //% handlerStatement=1
     //% weight=10
     export function onTick(interval: number, handler: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun) {
             // Key format: __tick_[ms]_[state] or __tick_[ms]
             let key = "__tick_" + interval;
@@ -241,8 +272,52 @@ namespace objects {
             _executeVerb(it, "__onStart", []);
             return it;
         }
-        return null;
+        throw `${nounName} is not defined`;
     }
+
+    /**
+    * Creates a new instance of a noun.
+    */
+    //% blockId="new_instance_block"
+    //% group="Instances"
+    //% block="new $nounName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
+    //% nounName.shadow="objects_noun_picker"
+    //% blockSetVariable="myNoun"
+    //% inlineInputMode=inline
+    export function newNewInstance(nounName: string, arg0?: any, arg1?: any, arg2?: any, arg3?: any, arg4?: any, arg5?: any, arg6?: any, arg7?: any, arg8?: any, arg9?: any): NounInstance {
+        let args = [arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9]
+        if (nounRegistry[nounName]) {
+            let nounDef = nounRegistry[nounName];
+            let it = new NounInstance(nounDef.name, nounDef._verbs);
+            allInstances.push(it);
+            _executeVerb(it, "__new", args);
+            _executeVerb(it, "__onStart", []);
+            return it;
+        }
+        throw `${nounName} is not defined`;
+    }
+
+    /**
+    * Creates a new instance of a noun.
+    */
+    //% blockId="new_instance_no_return_block"
+    //% group="Instances"
+    //% block="new $nounName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
+    //% nounName.shadow="objects_noun_picker"
+    //% inlineInputMode=inline
+    export function spawn(nounName: string, arg0?: any, arg1?: any, arg2?: any, arg3?: any, arg4?: any, arg5?: any, arg6?: any, arg7?: any, arg8?: any, arg9?: any) {
+        let args = [arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9]
+        if (nounRegistry[nounName]) {
+            let nounDef = nounRegistry[nounName];
+            let it = new NounInstance(nounDef.name, nounDef._verbs);
+            allInstances.push(it);
+            _executeVerb(it, "__new", args);
+            _executeVerb(it, "__onStart", []);
+        } else {
+            throw `${nounName} is not defined`;
+        }
+    }
+    
     /**
      * Gets an array of all instances of a specific noun.
      */
@@ -265,7 +340,7 @@ namespace objects {
      */
     //% blockId="tell"
     //% group="Instances"
-    //% block="tell $instance $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
+    //% block="tell $instance to $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
     //% instance.shadow="self_block"
     //% instance.defl="self_block"
     //% verbName.shadow="objects_verb_picker"
@@ -280,7 +355,7 @@ namespace objects {
     */
     //% blockId="ask"
     //% group="Instances"
-    //% block="ask $instance $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
+    //% block="ask $instance to $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
     //% instance.shadow="self_block"
     //% instance.defl="self_block"
     //% verbName.shadow="objects_verb_picker"
@@ -305,7 +380,8 @@ namespace objects {
     //% key.shadow="objects_property_picker"
     export function getInstanceProperty(instance: any, key: string): any {
         let target = instance as NounInstance;
-        return target ? target._data[key] : null;
+        if (!target || Object.keys(target._data).indexOf(key) == -1) throw `cannot get ${key} of ${instance}`;
+        return target._data[key];
     }
 
     /**
@@ -319,7 +395,7 @@ namespace objects {
         if (frame && frame.locals[localName] !== undefined) {
             return frame.locals[localName];
         }
-        return null;
+        throw `no ${localName} in scope`;
     }
 
     /**
@@ -471,7 +547,7 @@ namespace objects {
     //% handlerStatement=1
     //% weight=8
     export function onEnterState(state: string, handler: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun && state) {
             currentNoun._verbs["__onEnter" + state] = new VerbDefinition(handler, []);
         }
@@ -487,7 +563,7 @@ namespace objects {
     //% handlerStatement=1
     //% weight=7
     export function onExitState(state: string, handler: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun && state) {
             currentNoun._verbs["__onExit" + state] = new VerbDefinition(handler, []);
         }
@@ -504,7 +580,7 @@ namespace objects {
     //% handlerStatement=1
     //% weight=10
     export function onTickInState(interval: number, state: string, handler: () => void): void {
-        let currentNoun = peek(_nounDefinitionStack) as NounDefinition;
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
         if (currentNoun) {
             // Key format: __tick_[ms]_[state] or __tick_[ms]
             let key = "__tick_" + interval + (state ? "_" + state : "");
@@ -560,6 +636,13 @@ namespace objects {
     //% group="Utility"
     export function asArray(val: any): any[] {
         return val as any[];
+    }
+
+    //% blockId="as_binary_block"
+    //% block="$val as binary"
+    //% group="Utility"
+    export function asBinary(val: any): boolean {
+        return val as boolean;
     }
 
     //% block="$val as number"
