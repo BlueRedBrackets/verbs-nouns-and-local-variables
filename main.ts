@@ -4,6 +4,7 @@ namespace SpriteKind {
     export const StruckEnemy = SpriteKind.create()
     export const AvionicsDisplay = SpriteKind.create()
     export const Debris = SpriteKind.create()
+    export const Satellite = SpriteKind.create()
 }
 function hypotenuse (a: number, b: number) {
     return Math.sqrt(a ** 2 + b ** 2)
@@ -54,6 +55,28 @@ function toUnitVector (directionRadians: number) {
     objects.setLocal("__resultX", Math.cos(directionRadians))
     objects.setLocal("__resultY", Math.sin(directionRadians))
 }
+function defineText () {
+    objects.defineNoun("AvionicsDisplay", function () {
+        objects.defineNew("", function () {
+            objects.setInstanceProperty(objects.self(), "hullIndicator", objects.newNewInstance("BarIndicator", 0, 0, 64, 4, true))
+            objects.setInstanceProperty(objects.self(), "fuelIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, 0, 64, 4, false))
+            objects.setInstanceProperty(objects.self(), "weaponsIndicator", objects.newNewInstance("BarIndicator", 0, scene.screenHeight() - 4, 64, 4, true))
+            objects.setInstanceProperty(objects.self(), "specialIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, scene.screenHeight() - 4, 64, 4, false))
+        })
+        objects.defineAritousVerb("updateFuel", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "fuelIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+        objects.defineAritousVerb("updateHull", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "hullIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+        objects.defineAritousVerb("updateWeapons", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "weaponsIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+        objects.defineAritousVerb("updateSpecial", "current, max", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "specialIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
+        })
+    })
+}
 function definePilot () {
     objects.defineNoun("Pilot", function () {
         objects.defineNew("flightControl, weaponsControl, specialControl", function () {
@@ -72,7 +95,6 @@ function definePilot () {
             }
             if (controller.B.isPressed()) {
                 objects.tell(objects.getInstanceProperty(objects.self(), "specialControl"), "activate")
-                console.log("b")
             }
         })
     })
@@ -112,8 +134,7 @@ function toRadians (x: number, y: number) {
 }
 function defineFlightControl () {
     objects.defineNoun("FlightControl", function () {
-        objects.defineNew("ship", function () {
-            objects.setInstanceProperty(objects.self(), "engine", objects.newNewInstance("Engine", 2, 300, objects.getLocal("ship")))
+        objects.defineNew("ship, engine", function () {
             objects.setInstanceProperty(objects.self(), "attitude", objects.getSpriteFromNoun(objects.getLocal("ship")).rotation)
             objects.setState(objects.self(), "enabled")
         })
@@ -138,6 +159,23 @@ function defineFlightControl () {
     })
 }
 function defineEngine () {
+    objects.defineNoun("PerpetualMotionEngine", function () {
+        objects.defineNew("power, ship", function () {
+        	
+        })
+        objects.onTickInState(objects.everyFrame(), "running", function () {
+            objects.tell(objects.getInstanceProperty(objects.self(), "ship"), "thrust", objects.getInstanceProperty(objects.self(), "power"))
+        })
+        objects.defineNullaryVerb("start", function () {
+            objects.setState(objects.self(), "running")
+        })
+        objects.defineNullaryVerb("stop", function () {
+            objects.setState(objects.self(), "idle")
+        })
+        objects.defineNullaryVerb("haveFuel?", function () {
+            objects.answer(true)
+        })
+    })
     objects.defineNoun("Engine", function () {
         objects.defineNew("power, maxFuel, ship", function () {
             objects.setInstanceProperty(objects.self(), "avionicsDisplay", objects.getInstanceProperty(objects.getLocal("ship"), "avionicsDisplay"))
@@ -178,8 +216,8 @@ function defineAvionicsDisplay () {
         objects.defineNew("", function () {
             objects.setInstanceProperty(objects.self(), "hullIndicator", objects.newNewInstance("BarIndicator", 0, 0, 64, 4, true))
             objects.setInstanceProperty(objects.self(), "fuelIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, 0, 64, 4, false))
-            objects.setInstanceProperty(objects.self(), "weaponsIndicator", objects.newNewInstance("BarIndicator", 0, scene.screenHeight() - 4, 64, 4, false))
-            objects.setInstanceProperty(objects.self(), "specialIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, scene.screenHeight() - 4, 64, 4, true))
+            objects.setInstanceProperty(objects.self(), "weaponsIndicator", objects.newNewInstance("BarIndicator", 0, scene.screenHeight() - 4, 64, 4, true))
+            objects.setInstanceProperty(objects.self(), "specialIndicator", objects.newNewInstance("BarIndicator", scene.screenWidth() - 64, scene.screenHeight() - 4, 64, 4, false))
         })
         objects.defineAritousVerb("updateFuel", "current, max", function () {
             objects.tell(objects.getInstanceProperty(objects.self(), "fuelIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
@@ -194,6 +232,9 @@ function defineAvionicsDisplay () {
             objects.tell(objects.getInstanceProperty(objects.self(), "specialIndicator"), "updatePercentage", objects.getLocal("current"), objects.getLocal("max"))
         })
     })
+}
+function distance (a: Sprite, b: Sprite) {
+    return hypotenuse(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 }
 function defineSpecialControl () {
     objects.defineNoun("SpecialControl", function () {
@@ -215,12 +256,15 @@ function defineSpecialControl () {
         objects.defineAritousVerb("install", "module", function () {
             objects.setInstanceProperty(objects.self(), "installed", objects.getLocal("module"))
             objects.setInstanceProperty(objects.self(), "ticksUntilReady", objects.getInstanceProperty(objects.getInstanceProperty(objects.self(), "installed"), "cooldownTicks"))
-            objects.setInstanceProperty(objects.self(), "cooldownTicks", 0)
             objects.setState(objects.self(), "cooldown")
+        })
+        objects.onEnterState("cooldown", function () {
+            objects.setInstanceProperty(objects.self(), "cooldownTicks", 0)
         })
         objects.defineNullaryVerb("activate", function () {
             if (objects.isInState(objects.self(), "ready")) {
                 objects.tell(objects.getInstanceProperty(objects.self(), "installed"), "activate")
+                objects.setState(objects.self(), "cooldown")
             }
         })
     })
@@ -279,7 +323,7 @@ function defineShip () {
             objects.getSpriteFromNoun(objects.self()).setStayInScreen(true)
             objects.getSpriteFromNoun(objects.self()).setBounceOnWall(true)
             objects.setInstanceProperty(objects.self(), "avionicsDisplay", objects.newNewInstance("AvionicsDisplay"))
-            objects.setInstanceProperty(objects.self(), "flightControl", objects.newNewInstance("FlightControl", objects.self()))
+            objects.setInstanceProperty(objects.self(), "flightControl", objects.newNewInstance("FlightControl", objects.self(), objects.newNewInstance("Engine", 2, 300, objects.self())))
             objects.setInstanceProperty(objects.self(), "weaponsControl", objects.newNewInstance("WeaponsControl", objects.self()))
             objects.setInstanceProperty(objects.self(), "specialControl", objects.newNewInstance("SpecialControl", objects.self()))
             objects.setInstanceProperty(objects.self(), "pilot", objects.newNewInstance("Pilot", objects.getInstanceProperty(objects.self(), "flightControl"), objects.getInstanceProperty(objects.self(), "weaponsControl"), objects.getInstanceProperty(objects.self(), "specialControl")))
@@ -304,6 +348,7 @@ function defineShip () {
             }
         })
         objects.defineAritousVerb("hullBroken", "", function () {
+            objects.getSpriteFromNoun(objects.self()).sayText("ouch", 2000, true)
             objects.getSpriteFromNoun(objects.self()).image.fill(0)
             objects.setState(objects.getInstanceProperty(objects.self(), "flightControl"), "disabled")
             objects.setState(objects.getInstanceProperty(objects.self(), "weaponsControl"), "disabled")
@@ -317,10 +362,7 @@ function defineShip () {
                 objects.setLocal("particleVy", (objects.getSpriteFromNoun(objects.self()).vy + randint(-20, 20)) / 2)
                 objects.spawn("Particle", 1, objects.getLocal("particleX"), objects.getLocal("particleY"), objects.getLocal("particleVx"), objects.getLocal("particleVy"), randint(300, 600))
             }
-        })
-        objects.defineAritousVerb("equip", "weapon", function () {
-            objects.setInstanceProperty(objects.self(), "weapon", objects.getLocal("weapon"))
-            objects.setInstanceProperty(objects.getLocal("weapon"), "ship", objects.self())
+            objects.getSpriteFromNoun(objects.self()).setVelocity(0, 0)
         })
         objects.defineAritousVerb("struck", "damage", function () {
             objects.tell(objects.getInstanceProperty(objects.self(), "hull"), "damage", objects.getLocal("damage"))
@@ -450,6 +492,9 @@ for (let index = 0; index < 3; index++) {
         objects.spawn("Astroid", objects.getLocal("x"), objects.getLocal("y"), objects.getLocal("vx"), objects.getLocal("vy"), objects.getLocal("size"))
     })
 }
+objects.getSpriteFromNoun(myNoun).sayText("hello", 2000, true)
+music.rest(music.beat(BeatFraction.Breve))
+objects.getSpriteFromNoun(myNoun).sayText("world", 2000, true)
 game.onUpdateInterval(5000, function () {
     if (objects.getAllInstancesOf("Astroid").length <= 0) {
         music.stopAllSounds()
