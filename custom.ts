@@ -2,8 +2,34 @@
  * Object Blocks
  */
 //% weight=100 color=#0fbc11 icon="\uf1b2"
-//% groups='["Definitions", "Instances", "Getters", "Setters", "Utility"]'
+//% groups='["Definitions", "Instances", "Getters", "Setters", "Controls", "Utility", "States"]'
 namespace objects {
+
+    export enum ObjectsButton {
+        //% block="direction"
+        Direction,
+        //% block="up"
+        Up,
+        //% block="down"
+        Down,
+        //% block="left"
+        Left,
+        //% block="right"
+        Right,
+        //% block="A"
+        A,
+        //% block="B"
+        B
+    }
+
+    export enum ObjectsButtonEvent {
+        //% block="pressed"
+        Pressed,
+        //% block="released"
+        Released,
+        //% block="held"
+        Held
+    }
 
     export class LocalFrame {
         self: NounInstance;
@@ -118,7 +144,7 @@ namespace objects {
     /**
      * Defines a noun.
      */
-    //% blockId="define_noun_block"
+    //% blockId="objects_define_noun_block"
     //% group="Definitions"
     //% block="define noun $name"
     //% name.shadow="objects_noun_picker"
@@ -136,7 +162,7 @@ namespace objects {
     /**
      * Defines a verb with arguments.
      */
-    //% blockId="define_new_block"
+    //% blockId="objects_define_new_block"
     //% group="Definitions"
     //% block="define new using $argNames"
     //% argNames.shadow="text"
@@ -161,7 +187,7 @@ namespace objects {
     /**
      * Defines a verb with arguments.
      */
-    //% blockId="define_variadic_verb_block"
+    //% blockId="objects_define_variadic_verb_block"
     //% group="Definitions"
     //% block="define verb $verbName using $argNames"
     //% verbName.shadow="objects_verb_picker"
@@ -181,7 +207,7 @@ namespace objects {
     /**
     * Defines a simple verb.
     */
-    //% blockId="define_nullary_verb_block"
+    //% blockId="objects_define_nullary_verb_block"
     //% group="Definitions"
     //% block="define verb $verbName"
     //% verbName.shadow="objects_verb_picker"
@@ -196,7 +222,7 @@ namespace objects {
     /**
     * Defines a simple verb.
     */
-    //% blockId="define_local_frame_block"
+    //% blockId="objects_define_local_frame_block"
     //% group="Definitions"
     //% block="context"
     //% handlerStatement=1
@@ -214,7 +240,7 @@ namespace objects {
     /**
     * Provide an answer from the current verb.
     */
-    //% blockId="answer_block"
+    //% blockId="objects_answer_block"
     //% group="Definitions"
     //% block="answer with $value"
     export function answer(value: any): void {
@@ -226,10 +252,10 @@ namespace objects {
     /**
     * A reference to yourself.
     */
-    //% blockId="self_block"
+    //% blockId="objects_self_block"
     //% group="Definitions"
     //% block="self"
-    export function self(): any {
+    export function self(): NounInstance {
         let frame = peek(LOCAL_FRAME_STACK) as LocalFrame;
         if (!frame || !frame.self) throw `Block Error: objects.self() used outside of a valid noun instance context.`;
         return frame.self;
@@ -238,11 +264,11 @@ namespace objects {
     /**
     * Runs logic at an interval (or every frame) and optionally only in a state.
     */
-    //% blockId="on_noun_tick_block"
+    //% blockId="objects_on_noun_tick_block"
     //% group="States"
     //% block="on every $interval"
-    //% interval.shadow="every_frame_tick_block"
-    //% state.shadow="objects_state_picker"
+    //% interval.shadow="objects_every_frame_tick_block"
+    //% interval.defl="objects_every_frame_tick_block"
     //% handlerStatement=1
     //% weight=10
     export function onTick(interval: number, handler: () => void): void {
@@ -264,7 +290,7 @@ namespace objects {
     /**
     * Creates a new instance of a noun.
     */
-    //% blockId="new_instance_block"
+    //% blockId="objects_new_instance_block"
     //% group="Instances"
     //% block="new $nounName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
     //% nounName.shadow="objects_noun_picker"
@@ -284,7 +310,7 @@ namespace objects {
     /**
     * Creates a new instance of a noun without returning it.
     */
-    //% blockId="new_instance_no_return_block"
+    //% blockId="objects_new_instance_no_return_block"
     //% group="Instances"
     //% block="new $nounName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
     //% nounName.shadow="objects_noun_picker"
@@ -303,7 +329,7 @@ namespace objects {
     /**
      * Gets an array of all instances of a specific noun.
      */
-    //% blockId="get_all_instances_of_block"
+    //% blockId="objects_get_all_instances_of_block"
     //% group="Instances"
     //% block="array of all $nounName"
     //% nounName.shadow="objects_noun_picker"
@@ -320,11 +346,11 @@ namespace objects {
     /**
      * Tells an instance to do a verb.
      */
-    //% blockId="tell_block"
+    //% blockId="objects_tell_block"
     //% group="Instances"
     //% block="tell $instance to $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% verbName.shadow="objects_verb_picker"
     //% inlineInputMode=inline
     export function tell(instance: NounInstance, verbName: string, arg0?: any, arg1?: any, arg2?: any, arg3?: any, arg4?: any, arg5?: any, arg6?: any, arg7?: any, arg8?: any, arg9?: any): void {
@@ -336,11 +362,11 @@ namespace objects {
     /**
     * Asks a noun for an answer.
     */
-    //% blockId="ask_block"
+    //% blockId="objects_ask_block"
     //% group="Instances"
     //% block="ask $instance to $verbName|| using $arg0 $arg1 $arg2 $arg3 $arg4 $arg5 $arg6 $arg7 $arg8 $arg9"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% verbName.shadow="objects_verb_picker"
     //% inlineInputMode=inline
     export function ask(instance: NounInstance, verbName: string, arg0?: any, arg1?: any, arg2?: any, arg3?: any, arg4?: any, arg5?: any, arg6?: any, arg7?: any, arg8?: any, arg9?: any): any {
@@ -356,11 +382,11 @@ namespace objects {
     /**
      * Get a property from a specific instance.
      */
-    //% blockId="get_instance_property_block"
+    //% blockId="objects_get_instance_property_block"
     //% group="Getters"
     //% block="$key of $instance"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% key.shadow="objects_property_picker"
     export function getInstanceProperty(instance: NounInstance, key: string): any {
         if (!instance) throw `Block Error: Attempted to get property '${key}' from a null instance.`;
@@ -373,7 +399,7 @@ namespace objects {
     /**
     * Gets an argument or local variable from the current frame.
     */
-    //% blockId="get_verb_local_variable_block"
+    //% blockId="objects_get_verb_local_variable_block"
     //% group="Getters"
     //% block="get $localName"
     export function getLocal(localName: string): any {
@@ -388,7 +414,7 @@ namespace objects {
     /**
      * Gets the noun instance associated with a sprite.
      */
-    //% blockId="get_noun_from_sprite_block"
+    //% blockId="objects_get_noun_from_sprite_block"
     //% group="Getters"
     //% block="$sprite noun"
     //% sprite.shadow="variables_get"
@@ -400,11 +426,11 @@ namespace objects {
     /**
      * Gets the sprite associated with a noun instance.
      */
-    //% blockId="get_sprite_from_noun_block"
+    //% blockId="objects_get_sprite_from_noun_block"
     //% group="Getters"
     //% block="$instance sprite"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     export function getSpriteFromNoun(instance: NounInstance): Sprite {
         if (!instance) return null;
         return instance._sprite || null;
@@ -417,11 +443,11 @@ namespace objects {
     /**
      * Set a property on a specific instance.
      */
-    //% blockId="set_instance_property_block"
+    //% blockId="objects_set_instance_property_block"
     //% group="Setters"
     //% block="set $instance $key to $value"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% key.shadow="objects_property_picker"
     export function setInstanceProperty(instance: NounInstance, key: string, value: any): void {
         if (!instance) throw `Block Error: Cannot set property '${key}' on a null instance.`;
@@ -431,7 +457,7 @@ namespace objects {
     /**
     * Sets a variable local to the current verb frame.
     */
-    //% blockId="set_verb_local_variable_block"
+    //% blockId="objects_set_verb_local_variable_block"
     //% group="Setters"
     //% block="set $localName to $value"
     export function setLocal(localName: string, value: any): void {
@@ -443,11 +469,11 @@ namespace objects {
     /**
      * Links a noun to a sprite instance.
      */
-    //% blockId="set_instance_sprite_block"
+    //% blockId="objects_set_instance_sprite_block"
     //% group="Setters"
     //% block="set $instance sprite $sprite"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% sprite.shadow="spritescreate"
     export function setInstanceSprite(sprite: Sprite, instance: NounInstance): void {
         if (!instance) throw `Block Error: Cannot set sprite for a null noun instance.`;
@@ -467,11 +493,11 @@ namespace objects {
     /**
     * Links a sprite to a noun instance.
     */
-    //% blockId="set_sprite_noun_block"
+    //% blockId="objects_set_sprite_noun_block"
     //% group="Setters"
     //% block="set $sprite noun $instance"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% sprite.shadow="variables_get"
     export function setSpriteNoun(sprite: Sprite, instance: NounInstance): void {
         if (!sprite) throw `Block Error: Cannot attach a noun to a null sprite.`;
@@ -486,11 +512,11 @@ namespace objects {
     /**
      * Changes the state and triggers transition verbs: onExitOldState and onEnterNewState.
      */
-    //% blockId="set_state_block"
+    //% blockId="objects_set_state_block"
     //% group="States"
     //% block="set $instance state to $newState"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% newState.shadow="objects_state_picker"
     export function setState(instance: NounInstance, newState: string): void {
         if (!instance) throw `Block Error: Cannot set state '${newState}' on a null instance.`;
@@ -508,11 +534,11 @@ namespace objects {
     /**
      * Gets the current state name of an instance.
      */
-    //% blockId="get_state_block"
+    //% blockId="objects_get_state_block"
     //% group="States"
     //% block="$instance state"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     export function getState(instance: NounInstance): string {
         if (!instance) throw `Block Error: Cannot get state of a null instance.`;
         return getInstanceProperty(instance, "__state") || undefined;
@@ -521,7 +547,7 @@ namespace objects {
     /**
     * Logic that runs once when an instance enters a specific state.
     */
-    //% blockId="on_enter_state_block"
+    //% blockId="objects_on_enter_state_block"
     //% group="States"
     //% block="on enter $state"
     //% state.shadow="objects_state_picker"
@@ -539,7 +565,7 @@ namespace objects {
     /**
      * Logic that runs once when an instance leaves a specific state.
      */
-    //% blockId="on_exit_state_block"
+    //% blockId="objects_on_exit_state_block"
     //% group="States"
     //% block="on exit $state"
     //% state.shadow="objects_state_picker"
@@ -557,10 +583,10 @@ namespace objects {
     /**
     * Runs logic at an interval (or every frame) and optionally only in a state.
     */
-    //% blockId="on_noun_tick_in_state_block"
+    //% blockId="objects_on_noun_tick_in_state_block"
     //% group="States"
     //% block="on every $interval when $state"
-    //% interval.shadow="every_frame_tick_block"
+    //% interval.shadow="objects_every_frame_tick_block"
     //% state.shadow="objects_state_picker"
     //% handlerStatement=1
     //% weight=10
@@ -579,21 +605,43 @@ namespace objects {
     /**
      * Checks if the instance is currently in a specific state.
      */
-    //% blockId="is_in_state_block"
+    //% blockId="objects_is_in_state_block"
     //% group="States"
     //% block="is $instance $stateName"
-    //% instance.shadow="self_block"
-    //% instance.defl="self_block"
+    //% instance.shadow="objects_self_block"
+    //% instance.defl="objects_self_block"
     //% stateName.shadow="objects_state_picker"
     export function isInState(instance: NounInstance, stateName: string): boolean {
         return getState(instance) === stateName;
     }
 
     // ==========================================
+    // CONTROLS
+    // ==========================================
+
+    /**
+    * Controller events TODO: description.
+    */
+    //% blockId="objects_on_button_event_when_state_block"
+    //% group="Controls"
+    //% block="on $button $event when $state"
+    //% state.shadow="objects_state_picker"
+    //% button.defl=ObjectsButton.A
+    //% event.defl=ObjectsButtonEvent.pressed
+    //% handlerStatement=1
+    export function onButtonEvent(button: ObjectsButton, event: ObjectsButtonEvent, state: string, handler: () => void): void {
+        let currentNoun = peek(NOUN_DEFINITION_STACK) as NounDefinition;
+        if (!currentNoun) throw `Block Error: objects.onButtonEvent must be placed inside an objects.defineNoun block.`;
+
+        let key = `__${button}_${event}_${state}`;
+        currentNoun._verbs[key] = new VerbDefinition(handler, ["data"]);
+    }
+
+    // ==========================================
     // UTILITY
     // ==========================================
 
-    //% blockId="lerp_block"
+    //% blockId="objects_lerp_block"
     //% group="Utility"
     //% block="lerp $start to $end by $amount"
     //% start.defl=0
@@ -604,7 +652,7 @@ namespace objects {
         return start + (end - start) * amount;
     }
 
-    //% blockId="lerp_radians_block"
+    //% blockId="objects_lerp_radians_block"
     //% group="Utility"
     //% block="lerp radians $start to $end by $amount"
     //% amount.defl=0.5
@@ -615,35 +663,35 @@ namespace objects {
         return start + delta * amount;
     }
 
-    //% blockId="as_array_block"
+    //% blockId="objects_as_array_block"
     //% block="$val as array"
     //% group="Utility"
     export function asArray(val: any): any[] {
         return val as any[];
     }
 
-    //% blockId="as_binary_block"
+    //% blockId="objects_as_binary_block"
     //% block="$val as binary"
     //% group="Utility"
     export function asBinary(val: any): boolean {
         return val as boolean;
     }
 
-    //% blockId="as_number_block"
+    //% blockId="objects_as_number_block"
     //% block="$val as number"
     //% group="Utility"
     export function asNumber(val: any): number {
         return val as number;
     }
 
-    //% blockId="as_image_block"
+    //% blockId="objects_as_image_block"
     //% block="$val as image"
     //% group="Utility"
     export function asImage(val: any): Image {
         return val as Image;
     }
 
-    //% blockId="as_sprite_block"
+    //% blockId="objects_as_sprite_block"
     //% block="$val as sprite"
     //% group="Utility"
     export function asSprite(val: any): Sprite {
@@ -653,7 +701,7 @@ namespace objects {
     /**
      * A value representing every frame (0 ms).
      */
-    //% blockId="every_frame_tick_block"
+    //% blockId="objects_every_frame_tick_block"
     //% block="tick"
     //% group="Utility"
     export function everyFrame(): number {
@@ -665,48 +713,49 @@ namespace objects {
     // ==========================================
 
     //% blockId=objects_noun_picker
-    //% block="$key"
+    //% block="$noun"
     //% shim=TD_ID
-    //% key.fieldEditor="autocomplete"
-    //% key.fieldOptions.decompileLiterals=true
-    //% key.fieldOptions.key="objects_noun_picker"
+    //% noun.fieldEditor="autocomplete"
+    //% noun.fieldOptions.decompileLiterals=true
+    //% noun.fieldOptions.key="objects_noun_picker"
     //% blockHidden=true
-    export function _nounPicker(key: string): string {
-        return key;
+    export function _nounPicker(noun: string): string {
+        return noun;
     }
 
     //% blockId=objects_verb_picker
-    //% block="$key"
+    //% block="$verb"
     //% shim=TD_ID
-    //% key.fieldEditor="autocomplete"
-    //% key.fieldOptions.decompileLiterals=true
-    //% key.fieldOptions.key="objects_verb_picker"
+    //% verb.fieldEditor="autocomplete"
+    //% verb.fieldOptions.decompileLiterals=true
+    //% verb.fieldOptions.key="objects_verb_picker"
     //% blockHidden=true
-    export function _verbPicker(key: string): string {
-        return key;
+    export function _verbPicker(verb: string): string {
+        return verb;
     }
 
     //% blockId=objects_property_picker
-    //% block="$key"
+    //% block="$property"
     //% shim=TD_ID
-    //% key.fieldEditor="autocomplete"
-    //% key.fieldOptions.decompileLiterals=true
-    //% key.fieldOptions.key="objects_property_picker"
+    //% property.fieldEditor="autocomplete"
+    //% property.fieldOptions.decompileLiterals=true
+    //% property.fieldOptions.key="objects_property_picker"
     //% blockHidden=true
-    export function _propertyPicker(key: string): string {
-        return key;
+    export function _propertyPicker(property: string): string {
+        return property;
     }
 
     //% blockId=objects_state_picker
-    //% block="$key"
+    //% block="$state"
     //% shim=TD_ID
-    //% key.fieldEditor="autocomplete"
-    //% key.fieldOptions.decompileLiterals=true
-    //% key.fieldOptions.key="objects_state_picker"
+    //% state.fieldEditor="autocomplete"
+    //% state.fieldOptions.decompileLiterals=true
+    //% state.fieldOptions.key="objects_state_picker"
     //% blockHidden=true
-    export function _statePicker(key: string): string {
-        return key;
+    export function _statePicker(state: string): string {
+        return state;
     }
+
 
     // ==========================================
     // AUTO-REGISTRATION / GLOBAL TICKER
